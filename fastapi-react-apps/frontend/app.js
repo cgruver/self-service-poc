@@ -7,6 +7,39 @@ async function fetchJson(url) {
   return await res.json();
 }
 
+function parseUiRouteFromLocation() {
+  try {
+    const path = window.location.pathname || "/";
+    const params = new URLSearchParams(window.location.search || "");
+    const env = params.get("env") || "";
+
+    const m = path.match(/^\/apps(?:\/([^/]+)(?:\/(namespaces|l4_ingress))?)?\/?$/);
+    if (!m) return { env, view: "apps", appname: "" };
+
+    const appname = m[1] ? decodeURIComponent(m[1]) : "";
+    const tail = m[2] || "";
+    if (tail === "namespaces") return { env, view: "namespaces", appname };
+    if (tail === "l4_ingress") return { env, view: "l4ingress", appname };
+    return { env, view: "apps", appname: "" };
+  } catch {
+    return { env: "", view: "apps", appname: "" };
+  }
+}
+
+function buildUiUrl({ view, env, appname }) {
+  const q = env ? `?env=${encodeURIComponent(env)}` : "";
+  if (view === "namespaces" && appname) return `/apps/${encodeURIComponent(appname)}/namespaces${q}`;
+  if (view === "l4ingress" && appname) return `/apps/${encodeURIComponent(appname)}/l4_ingress${q}`;
+  return `/apps${q}`;
+}
+
+function pushUiUrl(next, replace = false) {
+  const url = buildUiUrl(next);
+  const state = { view: next.view, env: next.env || "", appname: next.appname || "" };
+  if (replace) window.history.replaceState(state, "", url);
+  else window.history.pushState(state, "", url);
+}
+
 function uniqStrings(items) {
   const seen = new Set();
   const out = [];
@@ -36,6 +69,7 @@ function App() {
 
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
+  const [pendingRoute, setPendingRoute] = React.useState(() => parseUiRouteFromLocation());
 
   React.useEffect(() => {
     let cancelled = false;
@@ -46,9 +80,9 @@ function App() {
         setError("");
 
         const [deploymentType, user, envList] = await Promise.all([
-          fetchJson("/deployment_type"),
-          fetchJson("/current-user"),
-          fetchJson("/envlist"),
+          fetchJson("/api/deployment_type"),
+          fetchJson("/api/current-user"),
+          fetchJson("/api/envlist"),
         ]);
 
         if (cancelled) return;
@@ -59,7 +93,11 @@ function App() {
         const keys = Object.keys(envList);
         setEnvKeys(keys);
         const first = keys[0] || "";
-        setActiveEnv(first);
+        const initial = parseUiRouteFromLocation();
+        const initialEnv = keys.includes(initial.env) ? initial.env : first;
+        setPendingRoute(initial);
+        setActiveEnv(initialEnv);
+        pushUiUrl({ view: initial.view, env: initialEnv, appname: initial.appname }, true);
       } catch (e) {
         if (!cancelled) setError(e?.message || String(e));
       } finally {
@@ -82,7 +120,7 @@ function App() {
         setLoading(true);
         setError("");
 
-        const appsResp = await fetchJson(`/apps?env=${encodeURIComponent(activeEnv)}`);
+        const appsResp = await fetchJson(`/api/apps?env=${encodeURIComponent(activeEnv)}`);
         if (cancelled) return;
 
         setApps(appsResp);
@@ -102,7 +140,7 @@ function App() {
         const l4Pairs = await Promise.all(
           appNames.map(async (appname) => {
             const items = await fetchJson(
-              `/apps/${encodeURIComponent(appname)}/l4_ingress?env=${encodeURIComponent(activeEnv)}`,
+              `/api/apps/${encodeURIComponent(appname)}/l4_ingress?env=${encodeURIComponent(activeEnv)}`,
             );
             const ips = uniqStrings((items || []).flatMap((i) => i.allocated_ips || []));
             return [appname, ips];
@@ -114,6 +152,19 @@ function App() {
         const next = {};
         for (const [appname, ips] of l4Pairs) next[appname] = ips;
         setL4IpsByApp(next);
+
+        const pr = pendingRoute;
+        if (pr && (pr.env || "").toUpperCase() === (activeEnv || "").toUpperCase()) {
+          if (pr.view === "namespaces" && pr.appname) {
+            setPendingRoute({ env: activeEnv, view: "apps", appname: "" });
+            await openNamespaces(pr.appname, false);
+          } else if (pr.view === "l4ingress" && pr.appname) {
+            setPendingRoute({ env: activeEnv, view: "apps", appname: "" });
+            await openL4Ingress(pr.appname, false);
+          } else {
+            setPendingRoute({ env: activeEnv, view: "apps", appname: "" });
+          }
+        }
       } catch (e) {
         if (!cancelled) setError(e?.message || String(e));
       } finally {
@@ -146,25 +197,50 @@ function App() {
     return requireExactlyOneSelectedApp();
   }
 
-  async function onViewNamespaces() {
-    const appname = getDetailOrSelectedApp();
+  async function openNamespaces(appname, push = true) {
     if (!appname) return;
-
     try {
       setLoading(true);
       setError("");
       const resp = await fetchJson(
-        `/apps/${encodeURIComponent(appname)}/namespaces?env=${encodeURIComponent(activeEnv)}`,
+        `/api/apps/${encodeURIComponent(appname)}/namespaces?env=${encodeURIComponent(activeEnv)}`,
       );
       setDetailAppName(appname);
       setNamespaces(resp || {});
       setL4IngressItems([]);
       setView("namespaces");
+      if (push) pushUiUrl({ view: "namespaces", env: activeEnv, appname }, false);
     } catch (e) {
       setError(e?.message || String(e));
     } finally {
       setLoading(false);
     }
+  }
+
+  async function openL4Ingress(appname, push = true) {
+    if (!appname) return;
+    try {
+      setLoading(true);
+      setError("");
+      const items = await fetchJson(
+        `/api/apps/${encodeURIComponent(appname)}/l4_ingress?env=${encodeURIComponent(activeEnv)}`,
+      );
+      setDetailAppName(appname);
+      setL4IngressItems(items || []);
+      setNamespaces({});
+      setView("l4ingress");
+      if (push) pushUiUrl({ view: "l4ingress", env: activeEnv, appname }, false);
+    } catch (e) {
+      setError(e?.message || String(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onViewNamespaces() {
+    const appname = getDetailOrSelectedApp();
+    if (!appname) return;
+    await openNamespaces(appname, true);
   }
 
   function onBackToApps() {
@@ -173,6 +249,7 @@ function App() {
     setNamespaces({});
     setL4IngressItems([]);
     setError("");
+    pushUiUrl({ view: "apps", env: activeEnv, appname: "" }, false);
   }
 
   function onSelectAllFromFiltered(checked, appnames) {
@@ -183,23 +260,26 @@ function App() {
   async function onViewL4Ingress() {
     const appname = getDetailOrSelectedApp();
     if (!appname) return;
-
-    try {
-      setLoading(true);
-      setError("");
-      const items = await fetchJson(
-        `/apps/${encodeURIComponent(appname)}/l4_ingress?env=${encodeURIComponent(activeEnv)}`,
-      );
-      setDetailAppName(appname);
-      setL4IngressItems(items || []);
-      setNamespaces({});
-      setView("l4ingress");
-    } catch (e) {
-      setError(e?.message || String(e));
-    } finally {
-      setLoading(false);
-    }
+    await openL4Ingress(appname, true);
   }
+
+  React.useEffect(() => {
+    function onPopState() {
+      const r = parseUiRouteFromLocation();
+      setPendingRoute(r);
+      if (r.env) setActiveEnv(r.env);
+      else if (envKeys.length > 0 && !activeEnv) setActiveEnv(envKeys[0]);
+      if (r.view === "apps") {
+        setView("apps");
+        setDetailAppName("");
+        setNamespaces({});
+        setL4IngressItems([]);
+      }
+    }
+
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [envKeys, activeEnv]);
 
   function toggleSelectAll(checked) {
     if (checked) {
@@ -241,7 +321,10 @@ function App() {
             <button
               key={env}
               className={env === activeEnv ? "tab active" : "tab"}
-              onClick={() => setActiveEnv(env)}
+              onClick={() => {
+                setActiveEnv(env);
+                pushUiUrl({ view: "apps", env, appname: "" }, false);
+              }}
               type="button"
             >
               {env}
