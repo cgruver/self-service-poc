@@ -395,7 +395,24 @@ def _require_env(env: Optional[str]) -> str:
 @router.get("/apps")
 def list_apps(env: Optional[str] = None):
     env = _require_env(env)
-    return APPS_BY_ENV.get(env, {})
+    apps = APPS_BY_ENV.get(env, {})
+    namespaces_by_app = NAMESPACES_BY_ENV_AND_APP.get(env, {})
+
+    enriched: Dict[str, Dict[str, Any]] = {}
+    for appname, app in apps.items():
+        ns_obj = namespaces_by_app.get(appname, {})
+        clusters: List[str] = []
+        seen: set = set()
+        for ns in ns_obj.values():
+            for c in (ns.get("clusters") or []):
+                cs = str(c)
+                if cs not in seen:
+                    seen.add(cs)
+                    clusters.append(cs)
+
+        enriched[appname] = {**app, "clusters": clusters}
+
+    return enriched
 
 
 @router.get("/apps/{appname}/namespaces")

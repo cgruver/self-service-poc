@@ -1,8 +1,9 @@
-function AppsTable({ rows, l4IpsByApp, selectedApps, onToggleRow, onSelectAll }) {
+function AppsTable({ rows, clustersByApp, l4IpsByApp, selectedApps, onToggleRow, onSelectAll }) {
   const [filters, setFilters] = React.useState({
     appname: "",
     description: "",
     managedby: "",
+    clusters: "",
     namespaces: "",
     l4ips: "",
   });
@@ -24,6 +25,7 @@ function AppsTable({ rows, l4IpsByApp, selectedApps, onToggleRow, onSelectAll })
     const appname = formatValue(a?.appname).toLowerCase();
     const description = formatValue(a?.description).toLowerCase();
     const managedby = formatValue(a?.managedby).toLowerCase();
+    const clusters = formatValue((clustersByApp?.[a?.appname] || []).join(", ")).toLowerCase();
     const namespacesCount = formatValue(a?.totalns).toLowerCase();
     const l4ips = formatValue((l4IpsByApp?.[a?.appname] || []).join(", ")).toLowerCase();
 
@@ -31,6 +33,7 @@ function AppsTable({ rows, l4IpsByApp, selectedApps, onToggleRow, onSelectAll })
       appname.includes((filters.appname || "").toLowerCase()) &&
       description.includes((filters.description || "").toLowerCase()) &&
       managedby.includes((filters.managedby || "").toLowerCase()) &&
+      clusters.includes((filters.clusters || "").toLowerCase()) &&
       namespacesCount.includes((filters.namespaces || "").toLowerCase()) &&
       l4ips.includes((filters.l4ips || "").toLowerCase())
     );
@@ -54,6 +57,7 @@ function AppsTable({ rows, l4IpsByApp, selectedApps, onToggleRow, onSelectAll })
             <th>App Name</th>
             <th>Description</th>
             <th>Managed By</th>
+            <th>Clusters</th>
             <th>Namespaces</th>
             <th>L4 IPs</th>
           </tr>
@@ -83,6 +87,13 @@ function AppsTable({ rows, l4IpsByApp, selectedApps, onToggleRow, onSelectAll })
             <th>
               <input
                 className="filterInput"
+                value={filters.clusters}
+                onChange={(e) => setFilters((p) => ({ ...p, clusters: e.target.value }))}
+              />
+            </th>
+            <th>
+              <input
+                className="filterInput"
                 value={filters.namespaces}
                 onChange={(e) => setFilters((p) => ({ ...p, namespaces: e.target.value }))}
               />
@@ -99,7 +110,7 @@ function AppsTable({ rows, l4IpsByApp, selectedApps, onToggleRow, onSelectAll })
         <tbody>
           {filteredRows.length === 0 ? (
             <tr>
-              <td colSpan={6} className="muted">No apps found.</td>
+              <td colSpan={7} className="muted">No apps found.</td>
             </tr>
           ) : (
             filteredRows.map((a) => (
@@ -115,6 +126,7 @@ function AppsTable({ rows, l4IpsByApp, selectedApps, onToggleRow, onSelectAll })
                 <td>{a.appname}</td>
                 <td className="muted">{a.description || ""}</td>
                 <td>{a.managedby || ""}</td>
+                <td>{(clustersByApp?.[a.appname] || []).join(", ")}</td>
                 <td>{a.totalns ?? ""}</td>
                 <td>{(l4IpsByApp?.[a.appname] || []).join(", ")}</td>
               </tr>

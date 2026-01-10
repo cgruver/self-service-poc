@@ -13,15 +13,13 @@ def get_deployment_type():
     return {
         "deployment_env": "test",
         "title": {
-            "test": "OCP Management Portal (Test)",
-            "pilot": "OCP Management Portal (Live)",
-            "management": "OCP Management Portal (Management)",
-            "live": "OCP Management Portal",
+            "test": "OCP Provisioning Portal (Test)",
+            "staging": "OCP Provisioning Portal (Staging)",
+            "live": "OCP Provisioning Portal",
         },
         "headerColor": {
             "test": "red",
-            "pilot": "#384454",
-            "management": "orange",
+            "staging": "orange",
             "live": "#384454",
         },
     }

@@ -1,4 +1,4 @@
-function L4IngressTable({ items, selectedRows, onToggleRow }) {
+function L4IngressTable({ items }) {
   const [filters, setFilters] = React.useState({
     cluster: "",
     allocationId: "",
@@ -60,15 +60,13 @@ function L4IngressTable({ items, selectedRows, onToggleRow }) {
       <table>
         <thead>
           <tr>
-            <th>Select</th>
             <th>Cluster</th>
             <th>AllocationId</th>
-            <th>Total(Req/Alloc)</th>
+            <th>Count(Req/Alloc)</th>
             <th>Allocated IPs</th>
             <th>Links</th>
           </tr>
           <tr>
-            <th></th>
             <th>
               <input
                 className="filterInput"
@@ -109,23 +107,15 @@ function L4IngressTable({ items, selectedRows, onToggleRow }) {
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={6} className="muted">No L4 ingress allocations found.</td>
+              <td colSpan={5} className="muted">No L4 ingress allocations found.</td>
             </tr>
           ) : filteredRows.length === 0 ? (
             <tr>
-              <td colSpan={6} className="muted">No matches.</td>
+              <td colSpan={5} className="muted">No matches.</td>
             </tr>
           ) : (
             filteredRows.map((r) => (
               <tr key={r.key}>
-                <td>
-                  <input
-                    type="checkbox"
-                    checked={selectedRows.has(r.key)}
-                    onChange={(e) => onToggleRow(r.key, e.target.checked)}
-                    aria-label={`Select ${r.clusterNo || r.key}`}
-                  />
-                </td>
                 <td>{r.clusterNo}</td>
                 <td>{r.allocationId}</td>
                 <td>{r.total}</td>

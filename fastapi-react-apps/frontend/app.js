@@ -27,12 +27,12 @@ function App() {
 
   const [apps, setApps] = React.useState({});
   const [l4IpsByApp, setL4IpsByApp] = React.useState({});
+  const [clustersByApp, setClustersByApp] = React.useState({});
   const [selectedApps, setSelectedApps] = React.useState(() => new Set());
   const [view, setView] = React.useState("apps");
+  const [detailAppName, setDetailAppName] = React.useState("");
   const [namespaces, setNamespaces] = React.useState({});
-  const [selectedNamespaces, setSelectedNamespaces] = React.useState(() => new Set());
   const [l4IngressItems, setL4IngressItems] = React.useState([]);
-  const [selectedL4IngressRows, setSelectedL4IngressRows] = React.useState(() => new Set());
 
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
@@ -86,14 +86,19 @@ function App() {
         if (cancelled) return;
 
         setApps(appsResp);
+        const nextClusters = {};
+        for (const [appname, app] of Object.entries(appsResp || {})) {
+          nextClusters[appname] = Array.isArray(app?.clusters) ? app.clusters.map(String) : [];
+        }
+        setClustersByApp(nextClusters);
         setSelectedApps(new Set());
         setView("apps");
+        setDetailAppName("");
         setNamespaces({});
-        setSelectedNamespaces(new Set());
         setL4IngressItems([]);
-        setSelectedL4IngressRows(new Set());
 
         const appNames = Object.keys(appsResp);
+
         const l4Pairs = await Promise.all(
           appNames.map(async (appname) => {
             const items = await fetchJson(
@@ -122,7 +127,7 @@ function App() {
   }, [activeEnv]);
 
   const deploymentEnv = deployment?.deployment_env || "";
-  const bannerTitle = deployment?.title?.[deploymentEnv] || "OCP Management Portal";
+  const bannerTitle = deployment?.title?.[deploymentEnv] || "OCP App Provisioning Portal";
   const bannerColor = deployment?.headerColor?.[deploymentEnv] || "#384454";
 
   const appRows = Object.keys(apps).map((k) => apps[k]);
@@ -136,8 +141,13 @@ function App() {
     return selected[0];
   }
 
+  function getDetailOrSelectedApp() {
+    if (detailAppName) return detailAppName;
+    return requireExactlyOneSelectedApp();
+  }
+
   async function onViewNamespaces() {
-    const appname = requireExactlyOneSelectedApp();
+    const appname = getDetailOrSelectedApp();
     if (!appname) return;
 
     try {
@@ -146,10 +156,9 @@ function App() {
       const resp = await fetchJson(
         `/apps/${encodeURIComponent(appname)}/namespaces?env=${encodeURIComponent(activeEnv)}`,
       );
+      setDetailAppName(appname);
       setNamespaces(resp || {});
-      setSelectedNamespaces(new Set());
       setL4IngressItems([]);
-      setSelectedL4IngressRows(new Set());
       setView("namespaces");
     } catch (e) {
       setError(e?.message || String(e));
@@ -160,10 +169,9 @@ function App() {
 
   function onBackToApps() {
     setView("apps");
+    setDetailAppName("");
     setNamespaces({});
-    setSelectedNamespaces(new Set());
     setL4IngressItems([]);
-    setSelectedL4IngressRows(new Set());
     setError("");
   }
 
@@ -172,26 +180,8 @@ function App() {
     else setSelectedApps(new Set());
   }
 
-  function onToggleNamespace(name, checked) {
-    setSelectedNamespaces((prev) => {
-      const next = new Set(prev);
-      if (checked) next.add(name);
-      else next.delete(name);
-      return next;
-    });
-  }
-
-  function onToggleL4IngressRow(key, checked) {
-    setSelectedL4IngressRows((prev) => {
-      const next = new Set(prev);
-      if (checked) next.add(key);
-      else next.delete(key);
-      return next;
-    });
-  }
-
   async function onViewL4Ingress() {
-    const appname = requireExactlyOneSelectedApp();
+    const appname = getDetailOrSelectedApp();
     if (!appname) return;
 
     try {
@@ -200,10 +190,9 @@ function App() {
       const items = await fetchJson(
         `/apps/${encodeURIComponent(appname)}/l4_ingress?env=${encodeURIComponent(activeEnv)}`,
       );
+      setDetailAppName(appname);
       setL4IngressItems(items || []);
-      setSelectedL4IngressRows(new Set());
       setNamespaces({});
-      setSelectedNamespaces(new Set());
       setView("l4ingress");
     } catch (e) {
       setError(e?.message || String(e));
@@ -265,14 +254,25 @@ function App() {
             <button className="btn" type="button" onClick={onViewNamespaces}>
               View Namespaces
             </button>
+          ) : view === "l4ingress" ? (
+            <button className="btn" type="button" onClick={onBackToApps}>
+              Back to App
+            </button>
           ) : (
             <button className="btn" type="button" onClick={onBackToApps}>
               Back to App
             </button>
           )}
-          <button className="btn" type="button" onClick={onViewL4Ingress}>
-            View L4 ingress IPs
-          </button>
+
+          {view === "l4ingress" ? (
+            <button className="btn" type="button" onClick={onViewNamespaces}>
+              View Namespaces
+            </button>
+          ) : (
+            <button className="btn" type="button" onClick={onViewL4Ingress}>
+              View L4 ingress IPs
+            </button>
+          )}
         </div>
 
         {error ? <div className="status">Error: {error}</div> : null}
@@ -280,23 +280,30 @@ function App() {
         {view === "apps" ? (
           <AppsTable
             rows={appRows}
+            clustersByApp={clustersByApp}
             l4IpsByApp={l4IpsByApp}
             selectedApps={selectedApps}
             onToggleRow={toggleRow}
             onSelectAll={onSelectAllFromFiltered}
           />
         ) : view === "namespaces" ? (
-          <NamespacesTable
-            namespaces={namespaces}
-            selectedNamespaces={selectedNamespaces}
-            onToggleNamespace={onToggleNamespace}
-          />
+          <div>
+            <div style={{ marginTop: 8, marginBottom: 10, fontWeight: 600 }}>
+              {`namespaces allocated in different cluster for ${detailAppName || ""}`}
+            </div>
+            <NamespacesTable
+              namespaces={namespaces}
+            />
+          </div>
         ) : (
-          <L4IngressTable
-            items={l4IngressItems}
-            selectedRows={selectedL4IngressRows}
-            onToggleRow={onToggleL4IngressRow}
-          />
+          <div>
+            <div style={{ marginTop: 8, marginBottom: 10, fontWeight: 600 }}>
+              {`L4 ingress IPs allocated in different cluster for ${detailAppName || ""}`}
+            </div>
+            <L4IngressTable
+              items={l4IngressItems}
+            />
+          </div>
         )}
       </div>
     </div>
