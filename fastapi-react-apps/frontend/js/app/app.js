@@ -59,6 +59,11 @@ function isHomePath() {
   return path === "/home" || path === "/home/";
 }
 
+function isPrsPath() {
+  const path = (window.location.pathname || "/").toLowerCase();
+  return path === "/prs" || path === "/prs/";
+}
+
 function pushUiUrl(next, replace = false) {
   const url = buildUiUrl(next);
   const state = { view: next.view, env: next.env || "", appname: next.appname || "", ns: next.ns || "" };
@@ -119,6 +124,16 @@ function App() {
       return;
     }
 
+    if (nextTab === "PRs and Approval") {
+      if (!configComplete) {
+        setTopTab("Home");
+        window.history.pushState({ topTab: "Home" }, "", "/home");
+        return;
+      }
+      window.history.pushState({ topTab: "PRs and Approval" }, "", "/prs");
+      return;
+    }
+
     if (!configComplete) {
       setTopTab("Home");
       window.history.pushState({ topTab: "Home" }, "", "/home");
@@ -162,7 +177,9 @@ function App() {
         const initialEnv = keys.includes(initial.env) ? initial.env : first;
         setPendingRoute(initial);
         setActiveEnv(initialEnv);
-        pushUiUrl({ view: initial.view, env: initialEnv, appname: initial.appname, ns: initial.ns }, true);
+        if (!isHomePath() && !isPrsPath()) {
+          pushUiUrl({ view: initial.view, env: initialEnv, appname: initial.appname, ns: initial.ns }, true);
+        }
 
         const isComplete = Boolean(
           (cfg?.workspace || "").trim() && (cfg?.requestsRepo || "").trim() && (cfg?.renderedManifestsRepo || "").trim()
@@ -171,6 +188,11 @@ function App() {
 
         if (isHomePath()) {
           setTopTab("Home");
+        } else if (isPrsPath()) {
+          setTopTab(isComplete ? "PRs and Approval" : "Home");
+          if (!isComplete) {
+            window.history.replaceState({ topTab: "Home" }, "", "/home");
+          }
         } else {
           setTopTab(isComplete ? "Request provisioning" : "Home");
           if (!isComplete) {
@@ -272,7 +294,7 @@ function App() {
             const nsResp = await openNamespaces(pr.appname, false);
             const nsName = pr.ns || "";
             if (nsResp && nsName && nsResp[nsName]) {
-              viewNamespaceDetails(nsName, nsResp[nsName]);
+              viewNamespaceDetails(nsName, nsResp[nsName], pr.appname);
             }
           } else {
             setPendingRoute({ env: activeEnv, view: "apps", appname: "" });
@@ -392,6 +414,12 @@ function App() {
         return;
       }
 
+      if (isPrsPath()) {
+        setTopTab(configComplete ? "PRs and Approval" : "Home");
+        if (!configComplete) window.history.replaceState({ topTab: "Home" }, "", "/home");
+        return;
+      }
+
       const r = parseUiRouteFromLocation();
       setPendingRoute(r);
       if (r.env) setActiveEnv(r.env);
@@ -486,11 +514,12 @@ function App() {
     await openL4Ingress(appname, true);
   }
 
-  function viewNamespaceDetails(namespaceName, namespaceData) {
+  function viewNamespaceDetails(namespaceName, namespaceData, appnameOverride) {
     setDetailNamespace(namespaceData);
     setDetailNamespaceName(namespaceName);
     setView("namespaceDetails");
-    pushUiUrl({ view: "namespaceDetails", env: activeEnv, appname: detailAppName, ns: namespaceName }, false);
+    const appname = appnameOverride || detailAppName;
+    pushUiUrl({ view: "namespaceDetails", env: activeEnv, appname, ns: namespaceName }, false);
   }
 
   function onBackFromNamespaceDetails() {

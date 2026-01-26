@@ -97,7 +97,7 @@ function AppView({
         {topTab === "Home" ? (
           <div className="card" style={{ padding: 16 }}>
             <div style={{ marginBottom: 12, fontWeight: 600 }}>
-              This self-service Kubernetes provisioning platform enables application teams to request resources on demand, while enforcing platform and security standards through GitOps-based automation. The result is faster delivery, reduced manual effort, and consistent governance across all Kubernetes clusters.
+              This Kubernetes provisioning tool enables application teams to request resources on demand, while enforcing platform and security standards through GitOps-based automation. The result is faster delivery, reduced manual effort, and consistent governance across all Kubernetes clusters.
             </div>
 
             <div style={{ display: "grid", gap: 16, maxWidth: 720 }}>
