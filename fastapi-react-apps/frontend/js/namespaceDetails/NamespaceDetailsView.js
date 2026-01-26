@@ -15,6 +15,9 @@ function NamespaceDetailsView({ namespace, namespaceName, appname, env, onUpdate
   const [draftReqMemory, setDraftReqMemory] = React.useState("");
   const [draftLimCpu, setDraftLimCpu] = React.useState("");
   const [draftLimMemory, setDraftLimMemory] = React.useState("");
+  const [draftRbacSubjects, setDraftRbacSubjects] = React.useState([]);
+  const [draftRbacRoleRefKind, setDraftRbacRoleRefKind] = React.useState("");
+  const [draftRbacRoleRefName, setDraftRbacRoleRefName] = React.useState("");
 
   React.useEffect(() => {
     const initialClusters = Array.isArray(namespace?.clusters) ? namespace.clusters.map(String).join(",") : "";
@@ -25,6 +28,13 @@ function NamespaceDetailsView({ namespace, namespaceName, appname, env, onUpdate
     setDraftReqMemory(namespace?.resources?.requests?.memory == null ? "" : String(namespace.resources.requests.memory));
     setDraftLimCpu(namespace?.resources?.limits?.cpu == null ? "" : String(namespace.resources.limits.cpu));
     setDraftLimMemory(namespace?.resources?.limits?.memory == null ? "" : String(namespace.resources.limits.memory));
+
+    // Initialize RBAC draft values
+    const rbacSubjects = namespace?.rbac?.subjects && Array.isArray(namespace.rbac.subjects) ? namespace.rbac.subjects : [];
+    setDraftRbacSubjects(rbacSubjects);
+    setDraftRbacRoleRefKind(namespace?.rbac?.roleRef?.kind || "");
+    setDraftRbacRoleRefName(namespace?.rbac?.roleRef?.name || "");
+
     setEditEnabled(false);
   }, [namespace, namespaceName]);
 
@@ -118,6 +128,13 @@ function NamespaceDetailsView({ namespace, namespaceName, appname, env, onUpdate
                     setDraftReqMemory(namespace?.resources?.requests?.memory == null ? "" : String(namespace.resources.requests.memory));
                     setDraftLimCpu(namespace?.resources?.limits?.cpu == null ? "" : String(namespace.resources.limits.cpu));
                     setDraftLimMemory(namespace?.resources?.limits?.memory == null ? "" : String(namespace.resources.limits.memory));
+
+                    // Reset RBAC draft values
+                    const rbacSubjects = namespace?.rbac?.subjects && Array.isArray(namespace.rbac.subjects) ? namespace.rbac.subjects : [];
+                    setDraftRbacSubjects(rbacSubjects);
+                    setDraftRbacRoleRefKind(namespace?.rbac?.roleRef?.kind || "");
+                    setDraftRbacRoleRefName(namespace?.rbac?.roleRef?.name || "");
+
                     setEditEnabled(false);
                   }}
                 >
@@ -152,6 +169,13 @@ function NamespaceDetailsView({ namespace, namespaceName, appname, env, onUpdate
                         limits: {
                           cpu: (draftLimCpu || "").trim(),
                           memory: (draftLimMemory || "").trim(),
+                        },
+                      },
+                      rbac: {
+                        subjects: draftRbacSubjects,
+                        roleRef: {
+                          kind: (draftRbacRoleRefKind || "").trim(),
+                          name: (draftRbacRoleRefName || "").trim(),
                         },
                       },
                     });
@@ -261,7 +285,7 @@ function NamespaceDetailsView({ namespace, namespaceName, appname, env, onUpdate
       <div className="dashboardGrid" style={{ marginTop: '20px' }}>
 
         {/* Resources Card */}
-        <div className="dashboardCard dashboardCardFull">
+        <div className="dashboardCard">
           <div className="dashboardCardHeader">
             <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" style={{ marginRight: '8px' }}>
               <path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.777.416L8 13.101l-5.223 2.815A.5.5 0 0 1 2 15.5V2zm2-1a1 1 0 0 0-1 1v12.566l4.723-2.482a.5.5 0 0 1 .554 0L13 14.566V2a1 1 0 0 0-1-1H4z"/>
@@ -270,32 +294,61 @@ function NamespaceDetailsView({ namespace, namespaceName, appname, env, onUpdate
           </div>
           <div className="dashboardCardBody">
             {editEnabled ? (
-              <div className="attributesGrid">
-                <div className="attributeItem">
-                  <span className="attributeKey">Requests CPU</span>
-                  <input className="filterInput" value={draftReqCpu} onChange={(e) => setDraftReqCpu(e.target.value)} />
+              <div>
+                {/* Requests Section */}
+                <div style={{ marginBottom: '20px', paddingBottom: '20px', borderBottom: '2px solid #e9ecef' }}>
+                  <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: '#495057' }}>Requests</h4>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                    <span className="attributeKey" style={{ minWidth: '80px' }}>CPU:</span>
+                    <input className="filterInput" style={{ flex: 1 }} value={draftReqCpu} onChange={(e) => setDraftReqCpu(e.target.value)} placeholder="e.g., 100m" />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span className="attributeKey" style={{ minWidth: '80px' }}>Memory:</span>
+                    <input className="filterInput" style={{ flex: 1 }} value={draftReqMemory} onChange={(e) => setDraftReqMemory(e.target.value)} placeholder="e.g., 128Mi" />
+                  </div>
                 </div>
-                <div className="attributeItem">
-                  <span className="attributeKey">Requests Memory</span>
-                  <input className="filterInput" value={draftReqMemory} onChange={(e) => setDraftReqMemory(e.target.value)} />
-                </div>
-                <div className="attributeItem">
-                  <span className="attributeKey">Limits CPU</span>
-                  <input className="filterInput" value={draftLimCpu} onChange={(e) => setDraftLimCpu(e.target.value)} />
-                </div>
-                <div className="attributeItem">
-                  <span className="attributeKey">Limits Memory</span>
-                  <input className="filterInput" value={draftLimMemory} onChange={(e) => setDraftLimMemory(e.target.value)} />
+                {/* Limits Section */}
+                <div>
+                  <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: '#495057' }}>Limits</h4>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                    <span className="attributeKey" style={{ minWidth: '80px' }}>CPU:</span>
+                    <input className="filterInput" style={{ flex: 1 }} value={draftLimCpu} onChange={(e) => setDraftLimCpu(e.target.value)} placeholder="e.g., 500m" />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span className="attributeKey" style={{ minWidth: '80px' }}>Memory:</span>
+                    <input className="filterInput" style={{ flex: 1 }} value={draftLimMemory} onChange={(e) => setDraftLimMemory(e.target.value)} placeholder="e.g., 512Mi" />
+                  </div>
                 </div>
               </div>
             ) : Object.keys(resources).length > 0 ? (
-              <div className="attributesGrid">
-                {Object.entries(resources).map(([key, value]) => (
-                  <div key={key} className="attributeItem">
-                    <span className="attributeKey">{key}:</span>
-                    <span className="attributeValue">{formatValue(value)}</span>
+              <div>
+                {/* Requests Section */}
+                {resources.requests && (
+                  <div style={{ marginBottom: '20px', paddingBottom: '20px', borderBottom: '2px solid #e9ecef' }}>
+                    <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: '#495057' }}>Requests</h4>
+                    {Object.entries(resources.requests).map(([key, value]) => (
+                      <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                        <span className="attributeKey" style={{ minWidth: '80px' }}>{key}:</span>
+                        <span className="attributeValue">{formatValue(value)}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
+                {/* Limits Section */}
+                {resources.limits && (
+                  <div>
+                    <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: '#495057' }}>Limits</h4>
+                    {Object.entries(resources.limits).map(([key, value]) => (
+                      <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                        <span className="attributeKey" style={{ minWidth: '80px' }}>{key}:</span>
+                        <span className="attributeValue">{formatValue(value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {!resources.requests && !resources.limits && (
+                  <p className="muted">No resource information available</p>
+                )}
               </div>
             ) : (
               <p className="muted">No resource information available</p>
@@ -304,7 +357,7 @@ function NamespaceDetailsView({ namespace, namespaceName, appname, env, onUpdate
         </div>
 
         {/* RBAC Card */}
-        <div className="dashboardCard dashboardCardFull">
+        <div className="dashboardCard">
           <div className="dashboardCardHeader">
             <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" style={{ marginRight: '8px' }}>
               <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
@@ -312,23 +365,154 @@ function NamespaceDetailsView({ namespace, namespaceName, appname, env, onUpdate
             <h3>RBAC</h3>
           </div>
           <div className="dashboardCardBody">
-            {Object.keys(rbac).length > 0 ? (
-              <div className="attributesGrid">
-                {Object.entries(rbac).map(([key, value]) => (
-                  <div key={key} className="attributeItem">
-                    <span className="attributeKey">{key}:</span>
-                    <span className="attributeValue">{formatValue(value)}</span>
+            {editEnabled ? (
+              <div>
+                {/* Subjects Section - Edit Mode */}
+                <div style={{ marginBottom: '20px', paddingBottom: '20px', borderBottom: '2px solid #e9ecef' }}>
+                  <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: '#495057' }}>Subjects</h4>
+                  {draftRbacSubjects.map((subject, idx) => (
+                    <div key={idx} style={{ marginBottom: '12px', padding: '8px', backgroundColor: '#f8f9fa', borderRadius: '4px', position: 'relative' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                        <span className="attributeKey" style={{ minWidth: '80px' }}>Kind:</span>
+                        <select
+                          className="filterInput"
+                          style={{ flex: 1 }}
+                          value={subject.kind || "User"}
+                          onChange={(e) => {
+                            const updated = [...draftRbacSubjects];
+                            updated[idx] = { ...updated[idx], kind: e.target.value };
+                            setDraftRbacSubjects(updated);
+                          }}
+                        >
+                          <option value="User">User</option>
+                          <option value="Group">Group</option>
+                          <option value="ServiceAccount">ServiceAccount</option>
+                        </select>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                        <span className="attributeKey" style={{ minWidth: '80px' }}>Name:</span>
+                        <input
+                          className="filterInput"
+                          style={{ flex: 1 }}
+                          value={subject.name || ""}
+                          onChange={(e) => {
+                            const updated = [...draftRbacSubjects];
+                            updated[idx] = { ...updated[idx], name: e.target.value };
+                            setDraftRbacSubjects(updated);
+                          }}
+                          placeholder="e.g., user@example.com"
+                        />
+                      </div>
+                      {draftRbacSubjects.length > 1 && (
+                        <button
+                          className="btn btn-sm"
+                          style={{ position: 'absolute', top: '8px', right: '8px', padding: '2px 8px', fontSize: '12px' }}
+                          onClick={() => {
+                            const updated = draftRbacSubjects.filter((_, i) => i !== idx);
+                            setDraftRbacSubjects(updated);
+                          }}
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    className="btn btn-sm btn-primary"
+                    style={{ marginTop: '8px' }}
+                    onClick={() => {
+                      setDraftRbacSubjects([...draftRbacSubjects, { kind: "User", name: "" }]);
+                    }}
+                  >
+                    + Add Subject
+                  </button>
+                </div>
+                {/* RoleRef Section - Edit Mode */}
+                <div>
+                  <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: '#495057' }}>Role Reference</h4>
+                  <div style={{ padding: '8px', backgroundColor: '#f8f9fa', borderRadius: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                      <span className="attributeKey" style={{ minWidth: '80px' }}>Kind:</span>
+                      <select
+                        className="filterInput"
+                        style={{ flex: 1 }}
+                        value={draftRbacRoleRefKind || "ClusterRole"}
+                        onChange={(e) => setDraftRbacRoleRefKind(e.target.value)}
+                      >
+                        <option value="ClusterRole">ClusterRole</option>
+                        <option value="Role">Role</option>
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span className="attributeKey" style={{ minWidth: '80px' }}>Name:</span>
+                      <input
+                        className="filterInput"
+                        style={{ flex: 1 }}
+                        value={draftRbacRoleRefName}
+                        onChange={(e) => setDraftRbacRoleRefName(e.target.value)}
+                        placeholder="e.g., cluster-admin, view"
+                      />
+                    </div>
                   </div>
-                ))}
+                </div>
               </div>
             ) : (
-              <p className="muted">No RBAC information available</p>
+              Object.keys(rbac).length > 0 ? (
+                <div>
+                  {/* Subjects Section */}
+                  {rbac.subjects && Array.isArray(rbac.subjects) && rbac.subjects.length > 0 && (
+                    <div style={{ marginBottom: '20px', paddingBottom: '20px', borderBottom: '2px solid #e9ecef' }}>
+                      <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: '#495057' }}>Subjects</h4>
+                      {rbac.subjects.map((subject, idx) => (
+                        <div key={idx} style={{ marginBottom: '12px', padding: '8px', backgroundColor: '#f8f9fa', borderRadius: '4px' }}>
+                          {Object.entries(subject).map(([key, value]) => (
+                            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                              <span className="attributeKey" style={{ minWidth: '80px' }}>{key}:</span>
+                              <span className="attributeValue">{String(value)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {/* RoleRef Section */}
+                  {rbac.roleRef && typeof rbac.roleRef === 'object' && (
+                    <div>
+                      <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: '#495057' }}>Role Reference</h4>
+                      <div style={{ padding: '8px', backgroundColor: '#f8f9fa', borderRadius: '4px' }}>
+                        {Object.entries(rbac.roleRef).map(([key, value]) => (
+                          <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                            <span className="attributeKey" style={{ minWidth: '80px' }}>{key}:</span>
+                            <span className="attributeValue">{String(value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {/* Other RBAC fields */}
+                  {Object.entries(rbac).filter(([key]) => key !== 'subjects' && key !== 'roleRef').length > 0 && (
+                    <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '2px solid #e9ecef' }}>
+                      <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: '#495057' }}>Other</h4>
+                      <div className="attributesGrid">
+                        {Object.entries(rbac).filter(([key]) => key !== 'subjects' && key !== 'roleRef').map(([key, value]) => (
+                          <div key={key} className="attributeItem">
+                            <span className="attributeKey">{key}:</span>
+                            <span className="attributeValue">{formatValue(value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="muted">No RBAC information available</p>
+              )
             )}
           </div>
         </div>
 
         {/* Policy Card */}
-        <div className="dashboardCard dashboardCardFull">
+        <div className="dashboardCard">
           <div className="dashboardCardHeader">
             <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" style={{ marginRight: '8px' }}>
               <path d="M5.338 1.59a61.44 61.44 0 0 0-2.837.856.481.481 0 0 0-.328.39c-.554 4.157.726 7.19 2.253 9.188a10.725 10.725 0 0 0 2.287 2.233c.346.244.652.42.893.533.12.057.218.095.293.118a.55.55 0 0 0 .101.025.615.615 0 0 0 .1-.025c.076-.023.174-.061.294-.118.24-.113.547-.29.893-.533a10.726 10.726 0 0 0 2.287-2.233c1.527-1.997 2.807-5.031 2.253-9.188a.48.48 0 0 0-.328-.39c-.651-.213-1.75-.56-2.837-.855C9.552 1.29 8.531 1.067 8 1.067c-.53 0-1.552.223-2.662.524zM5.072.56C6.157.265 7.31 0 8 0s1.843.265 2.928.56c1.11.3 2.229.655 2.887.87a1.54 1.54 0 0 1 1.044 1.262c.596 4.477-.787 7.795-2.465 9.99a11.775 11.775 0 0 1-2.517 2.453 7.159 7.159 0 0 1-1.048.625c-.28.132-.581.24-.829.24s-.548-.108-.829-.24a7.158 7.158 0 0 1-1.048-.625 11.777 11.777 0 0 1-2.517-2.453C1.928 10.487.545 7.169 1.141 2.692A1.54 1.54 0 0 1 2.185 1.43 62.456 62.456 0 0 1 5.072.56z"/>
