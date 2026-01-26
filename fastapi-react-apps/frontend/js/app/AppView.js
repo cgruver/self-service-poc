@@ -42,6 +42,7 @@ function AppView({
   onSelectAllNamespaces,
   deleteNamespace,
   viewNamespaceDetails,
+  onUpdateNamespaceInfo,
   detailAppName,
   l4IngressItems,
   egressIpItems,
@@ -234,7 +235,13 @@ function AppView({
                 onViewDetails={(appname) => openNamespaces(appname, true)}
               />
             ) : view === "namespaceDetails" ? (
-              <NamespaceDetails namespace={detailNamespace} namespaceName={detailNamespaceName} />
+              <NamespaceDetails
+                namespace={detailNamespace}
+                namespaceName={detailNamespaceName}
+                appname={detailAppName}
+                env={activeEnv}
+                onUpdateNamespaceInfo={onUpdateNamespaceInfo}
+              />
             ) : view === "namespaces" ? (
               <div>
                 <div style={{ marginTop: 8, marginBottom: 10, fontWeight: 600 }}>

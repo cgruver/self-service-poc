@@ -20,6 +20,19 @@ async function postJson(url, body) {
   return await res.json();
 }
 
+async function putJson(url, body) {
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(body || {}),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`${res.status} ${res.statusText}: ${text}`);
+  }
+  return await res.json();
+}
+
 function parseUiRouteFromLocation() {
   try {
     const path = window.location.pathname || "/";
@@ -141,7 +154,11 @@ function App() {
     }
 
     if (nextTab === "Request provisioning") {
-      pushUiUrl({ view, env: activeEnv, appname: detailAppName }, false);
+      const r = parseUiRouteFromLocation();
+      const nextEnv = r.env || activeEnv || (envKeys[0] || "");
+      if (nextEnv) setActiveEnv(nextEnv);
+      setPendingRoute({ env: nextEnv, view: r.view || "apps", appname: r.appname || "", ns: r.ns || "" });
+      pushUiUrl({ view: r.view || "apps", env: nextEnv, appname: r.appname || "", ns: r.ns || "" }, false);
       return;
     }
   }
@@ -530,6 +547,21 @@ function App() {
     pushUiUrl({ view: "namespaces", env: activeEnv, appname: detailAppName }, false);
   }
 
+  async function onUpdateNamespaceInfo(namespaceName, updates) {
+    const appname = detailAppName;
+    if (!appname) throw new Error("No application selected.");
+    if (!namespaceName) throw new Error("No namespace selected.");
+
+    const updated = await putJson(
+      `/api/apps/${encodeURIComponent(appname)}/namespaces/${encodeURIComponent(namespaceName)}/namespace_info?env=${encodeURIComponent(activeEnv)}`,
+      updates || {},
+    );
+
+    setDetailNamespace(updated);
+    setNamespaces((prev) => ({ ...(prev || {}), [namespaceName]: updated }));
+    return updated;
+  }
+
   async function deleteNamespace(namespaceName) {
     const appname = detailAppName;
     if (!appname) {
@@ -740,6 +772,7 @@ function App() {
       onSelectAllNamespaces={onSelectAllNamespaces}
       deleteNamespace={deleteNamespace}
       viewNamespaceDetails={viewNamespaceDetails}
+      onUpdateNamespaceInfo={onUpdateNamespaceInfo}
       detailAppName={detailAppName}
       l4IngressItems={l4IngressItems}
       egressIpItems={egressIpItems}

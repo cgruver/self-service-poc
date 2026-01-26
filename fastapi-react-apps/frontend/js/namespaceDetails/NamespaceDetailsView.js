@@ -1,4 +1,4 @@
-function NamespaceDetailsView({ namespace, namespaceName }) {
+function NamespaceDetailsView({ namespace, namespaceName, appname, env, onUpdateNamespaceInfo }) {
   if (!namespace) {
     return (
       <div className="card" style={{ padding: '24px', textAlign: 'center' }}>
@@ -6,6 +6,27 @@ function NamespaceDetailsView({ namespace, namespaceName }) {
       </div>
     );
   }
+
+  const [editEnabled, setEditEnabled] = React.useState(false);
+  const [draftClusters, setDraftClusters] = React.useState("");
+  const [draftManagedByArgo, setDraftManagedByArgo] = React.useState(false);
+  const [draftEgressNameId, setDraftEgressNameId] = React.useState("");
+  const [draftReqCpu, setDraftReqCpu] = React.useState("");
+  const [draftReqMemory, setDraftReqMemory] = React.useState("");
+  const [draftLimCpu, setDraftLimCpu] = React.useState("");
+  const [draftLimMemory, setDraftLimMemory] = React.useState("");
+
+  React.useEffect(() => {
+    const initialClusters = Array.isArray(namespace?.clusters) ? namespace.clusters.map(String).join(",") : "";
+    setDraftClusters(initialClusters);
+    setDraftManagedByArgo(Boolean(namespace?.need_argo || namespace?.generate_argo_app));
+    setDraftEgressNameId(namespace?.egress_nameid == null ? "" : String(namespace.egress_nameid));
+    setDraftReqCpu(namespace?.resources?.requests?.cpu == null ? "" : String(namespace.resources.requests.cpu));
+    setDraftReqMemory(namespace?.resources?.requests?.memory == null ? "" : String(namespace.resources.requests.memory));
+    setDraftLimCpu(namespace?.resources?.limits?.cpu == null ? "" : String(namespace.resources.limits.cpu));
+    setDraftLimMemory(namespace?.resources?.limits?.memory == null ? "" : String(namespace.resources.limits.memory));
+    setEditEnabled(false);
+  }, [namespace, namespaceName]);
 
   // Helper function to format values
   function formatValue(val) {
@@ -22,17 +43,50 @@ function NamespaceDetailsView({ namespace, namespaceName }) {
     return String(val);
   }
 
-  const clusters = formatValue(namespace?.clusters);
-  const egressNameId = formatValue(namespace?.egress_nameid);
-  const podBasedEgress = namespace?.enable_pod_based_egress_ip ? "Enabled" : "Disabled";
-  const egressFirewall = formatValue(namespace?.file_index?.egress);
-  const managedByArgo = namespace?.need_argo || namespace?.generate_argo_app ? "Yes" : "No";
+  const effectiveClusters = editEnabled
+    ? draftClusters
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : Array.isArray(namespace?.clusters)
+      ? namespace.clusters
+      : [];
+
+  const effectiveNamespace = editEnabled
+    ? {
+        ...namespace,
+        clusters: effectiveClusters,
+        egress_nameid: draftEgressNameId ? draftEgressNameId : null,
+        need_argo: Boolean(draftManagedByArgo),
+        generate_argo_app: false,
+        status: Boolean(draftManagedByArgo) ? "Argo used" : "Argo not used",
+        resources: {
+          ...(namespace?.resources || {}),
+          requests: {
+            ...(namespace?.resources?.requests || {}),
+            cpu: (draftReqCpu || "").trim(),
+            memory: (draftReqMemory || "").trim(),
+          },
+          limits: {
+            ...(namespace?.resources?.limits || {}),
+            cpu: (draftLimCpu || "").trim(),
+            memory: (draftLimMemory || "").trim(),
+          },
+        },
+      }
+    : namespace;
+
+  const clusters = formatValue(effectiveNamespace?.clusters);
+  const egressNameId = formatValue(effectiveNamespace?.egress_nameid);
+  const podBasedEgress = effectiveNamespace?.enable_pod_based_egress_ip ? "Enabled" : "Disabled";
+  const egressFirewall = formatValue(effectiveNamespace?.file_index?.egress);
+  const managedByArgo = effectiveNamespace?.need_argo || effectiveNamespace?.generate_argo_app ? "Yes" : "No";
 
   // Extract detailed attributes
-  const status = namespace?.status || {};
-  const resources = namespace?.resources || {};
-  const rbac = namespace?.rbac || {};
-  const policy = namespace?.policy || {};
+  const status = effectiveNamespace?.status || {};
+  const resources = effectiveNamespace?.resources || {};
+  const rbac = effectiveNamespace?.rbac || {};
+  const policy = effectiveNamespace?.policy || {};
 
   return (
     <div>
@@ -43,6 +97,70 @@ function NamespaceDetailsView({ namespace, namespaceName }) {
         </h2>
         <div style={{ fontSize: '14px', color: 'var(--muted)', marginTop: '4px' }}>
           Namespace Details
+        </div>
+        <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'center', gap: '8px' }}>
+          {!editEnabled ? (
+            <button className="btn btn-primary" type="button" onClick={() => setEditEnabled(true)}>
+              Enable Edit
+            </button>
+          ) : (
+            <>
+              <button
+                className="btn"
+                type="button"
+                onClick={() => {
+                  const initialClusters = Array.isArray(namespace?.clusters) ? namespace.clusters.map(String).join(",") : "";
+                  setDraftClusters(initialClusters);
+                  setDraftManagedByArgo(Boolean(namespace?.need_argo || namespace?.generate_argo_app));
+                  setDraftEgressNameId(namespace?.egress_nameid == null ? "" : String(namespace.egress_nameid));
+                  setDraftReqCpu(namespace?.resources?.requests?.cpu == null ? "" : String(namespace.resources.requests.cpu));
+                  setDraftReqMemory(namespace?.resources?.requests?.memory == null ? "" : String(namespace.resources.requests.memory));
+                  setDraftLimCpu(namespace?.resources?.limits?.cpu == null ? "" : String(namespace.resources.limits.cpu));
+                  setDraftLimMemory(namespace?.resources?.limits?.memory == null ? "" : String(namespace.resources.limits.memory));
+                  setEditEnabled(false);
+                }}
+              >
+                Discard Edits
+              </button>
+              <button
+                className="btn btn-primary"
+                type="button"
+                onClick={async () => {
+                  if (typeof onUpdateNamespaceInfo !== "function") {
+                    setEditEnabled(false);
+                    return;
+                  }
+
+                  const clusters = draftClusters
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean);
+                  const egress_nameid = (draftEgressNameId || "").trim();
+
+                  await onUpdateNamespaceInfo(namespaceName, {
+                    namespace_info: {
+                      clusters,
+                      need_argo: Boolean(draftManagedByArgo),
+                      egress_nameid,
+                    },
+                    resources: {
+                      requests: {
+                        cpu: (draftReqCpu || "").trim(),
+                        memory: (draftReqMemory || "").trim(),
+                      },
+                      limits: {
+                        cpu: (draftLimCpu || "").trim(),
+                        memory: (draftLimMemory || "").trim(),
+                      },
+                    },
+                  });
+                  setEditEnabled(false);
+                }}
+              >
+                Submit
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -58,18 +176,34 @@ function NamespaceDetailsView({ namespace, namespaceName }) {
           </div>
           <div className="dashboardCardBody">
             <div className="detailRow">
-              <span className="detailLabel">Name:</span>
-              <span className="detailValue">{namespaceName}</span>
-            </div>
-            <div className="detailRow">
               <span className="detailLabel">Clusters:</span>
-              <span className="detailValue detailValueHighlight">{clusters}</span>
+              {editEnabled ? (
+                <input
+                  className="filterInput"
+                  value={draftClusters}
+                  onChange={(e) => setDraftClusters(e.target.value)}
+                  placeholder="01,02,03"
+                />
+              ) : (
+                <span className="detailValue detailValueHighlight">{clusters}</span>
+              )}
             </div>
             <div className="detailRow">
               <span className="detailLabel">Managed by Argo:</span>
-              <span className={`detailBadge ${managedByArgo === 'Yes' ? 'detailBadgeSuccess' : 'detailBadgeSecondary'}`}>
-                {managedByArgo}
-              </span>
+              {editEnabled ? (
+                <select
+                  className="filterInput"
+                  value={draftManagedByArgo ? "Yes" : "No"}
+                  onChange={(e) => setDraftManagedByArgo(e.target.value === "Yes")}
+                >
+                  <option value="Yes">Yes</option>
+                  <option value="No">No</option>
+                </select>
+              ) : (
+                <span className={`detailBadge ${managedByArgo === 'Yes' ? 'detailBadgeSuccess' : 'detailBadgeSecondary'}`}>
+                  {managedByArgo}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -85,7 +219,15 @@ function NamespaceDetailsView({ namespace, namespaceName }) {
           <div className="dashboardCardBody">
             <div className="detailRow">
               <span className="detailLabel">Egress Name ID:</span>
-              <span className="detailValue">{egressNameId}</span>
+              {editEnabled ? (
+                <input
+                  className="filterInput"
+                  value={draftEgressNameId}
+                  onChange={(e) => setDraftEgressNameId(e.target.value)}
+                />
+              ) : (
+                <span className="detailValue">{egressNameId}</span>
+              )}
             </div>
             <div className="detailRow">
               <span className="detailLabel">Pod-Based Egress IP:</span>
@@ -93,8 +235,20 @@ function NamespaceDetailsView({ namespace, namespaceName }) {
                 {podBasedEgress}
               </span>
             </div>
+          </div>
+        </div>
+
+        {/* Egress Firewall Card */}
+        <div className="dashboardCard">
+          <div className="dashboardCardHeader">
+            <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" style={{ marginRight: '8px' }}>
+              <path fillRule="evenodd" d="M2.5 1a.5.5 0 0 0-.5.5v13a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 .5-.5v-13a.5.5 0 0 0-.5-.5h-11zM3 2h10v12H3V2zm2 2.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5A.5.5 0 0 1 5 4.5zm0 2a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5A.5.5 0 0 1 5 6.5zm0 2a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5A.5.5 0 0 1 5 8.5z"/>
+            </svg>
+            <h3>Egress Firewall</h3>
+          </div>
+          <div className="dashboardCardBody">
             <div className="detailRow">
-              <span className="detailLabel">Egress Firewall:</span>
+              <span className="detailLabel">Rules:</span>
               <span className="detailValue">{egressFirewall}</span>
             </div>
           </div>
@@ -113,7 +267,26 @@ function NamespaceDetailsView({ namespace, namespaceName }) {
             <h3>Resources</h3>
           </div>
           <div className="dashboardCardBody">
-            {Object.keys(resources).length > 0 ? (
+            {editEnabled ? (
+              <div className="attributesGrid">
+                <div className="attributeItem">
+                  <span className="attributeKey">Requests CPU</span>
+                  <input className="filterInput" value={draftReqCpu} onChange={(e) => setDraftReqCpu(e.target.value)} />
+                </div>
+                <div className="attributeItem">
+                  <span className="attributeKey">Requests Memory</span>
+                  <input className="filterInput" value={draftReqMemory} onChange={(e) => setDraftReqMemory(e.target.value)} />
+                </div>
+                <div className="attributeItem">
+                  <span className="attributeKey">Limits CPU</span>
+                  <input className="filterInput" value={draftLimCpu} onChange={(e) => setDraftLimCpu(e.target.value)} />
+                </div>
+                <div className="attributeItem">
+                  <span className="attributeKey">Limits Memory</span>
+                  <input className="filterInput" value={draftLimMemory} onChange={(e) => setDraftLimMemory(e.target.value)} />
+                </div>
+              </div>
+            ) : Object.keys(resources).length > 0 ? (
               <div className="attributesGrid">
                 {Object.entries(resources).map(([key, value]) => (
                   <div key={key} className="attributeItem">
@@ -177,25 +350,6 @@ function NamespaceDetailsView({ namespace, namespaceName }) {
         </div>
       </div>
 
-      {/* Raw JSON Section (collapsible) */}
-      <details className="dashboardCard" style={{ marginTop: '20px', cursor: 'pointer' }}>
-        <summary style={{ padding: '16px', fontWeight: '600', fontSize: '16px' }}>
-          📋 View Raw JSON Data
-        </summary>
-        <div style={{ padding: '0 16px 16px 16px' }}>
-          <pre style={{
-            background: '#f8f9fa',
-            padding: '16px',
-            borderRadius: '6px',
-            overflow: 'auto',
-            maxHeight: '400px',
-            fontSize: '12px',
-            lineHeight: '1.5'
-          }}>
-            {JSON.stringify(namespace, null, 2)}
-          </pre>
-        </div>
-      </details>
     </div>
   );
 }
