@@ -25,8 +25,9 @@ function parseUiRouteFromLocation() {
     const path = window.location.pathname || "/";
     const params = new URLSearchParams(window.location.search || "");
     const env = params.get("env") || "";
+    const ns = params.get("ns") || "";
 
-    const m = path.match(/^\/apps(?:\/([^/]+)(?:\/(namespaces|l4_ingress|egress_ips))?)?\/$/);
+    const m = path.match(/^\/apps(?:\/([^/]+)(?:\/(namespaces|l4_ingress|egress_ips|ns_details))?)?\/?$/);
     if (!m) return { env, view: "apps", appname: "" };
 
     const appname = m[1] ? decodeURIComponent(m[1]) : "";
@@ -34,17 +35,22 @@ function parseUiRouteFromLocation() {
     if (tail === "namespaces") return { env, view: "namespaces", appname };
     if (tail === "l4_ingress") return { env, view: "l4ingress", appname };
     if (tail === "egress_ips") return { env, view: "egressips", appname };
+    if (tail === "ns_details") return { env, view: "namespaceDetails", appname, ns };
     return { env, view: "apps", appname: "" };
   } catch {
     return { env: "", view: "apps", appname: "" };
   }
 }
 
-function buildUiUrl({ view, env, appname }) {
+function buildUiUrl({ view, env, appname, ns }) {
   const q = env ? `?env=${encodeURIComponent(env)}` : "";
   if (view === "namespaces" && appname) return `/apps/${encodeURIComponent(appname)}/namespaces${q}`;
   if (view === "l4ingress" && appname) return `/apps/${encodeURIComponent(appname)}/l4_ingress${q}`;
   if (view === "egressips" && appname) return `/apps/${encodeURIComponent(appname)}/egress_ips${q}`;
+  if (view === "namespaceDetails" && appname) {
+    const nsq = ns ? `${q ? "&" : "?"}ns=${encodeURIComponent(ns)}` : "";
+    return `/apps/${encodeURIComponent(appname)}/ns_details${q}${nsq}`;
+  }
   return `/apps${q}`;
 }
 
@@ -55,7 +61,7 @@ function isHomePath() {
 
 function pushUiUrl(next, replace = false) {
   const url = buildUiUrl(next);
-  const state = { view: next.view, env: next.env || "", appname: next.appname || "" };
+  const state = { view: next.view, env: next.env || "", appname: next.appname || "", ns: next.ns || "" };
   if (replace) window.history.replaceState(state, "", url);
   else window.history.pushState(state, "", url);
 }
@@ -156,7 +162,7 @@ function App() {
         const initialEnv = keys.includes(initial.env) ? initial.env : first;
         setPendingRoute(initial);
         setActiveEnv(initialEnv);
-        pushUiUrl({ view: initial.view, env: initialEnv, appname: initial.appname }, true);
+        pushUiUrl({ view: initial.view, env: initialEnv, appname: initial.appname, ns: initial.ns }, true);
 
         const isComplete = Boolean(
           (cfg?.workspace || "").trim() && (cfg?.requestsRepo || "").trim() && (cfg?.renderedManifestsRepo || "").trim()
@@ -261,6 +267,13 @@ function App() {
           } else if (pr.view === "egressips" && pr.appname) {
             setPendingRoute({ env: activeEnv, view: "apps", appname: "" });
             await openEgressIps(pr.appname, false);
+          } else if (pr.view === "namespaceDetails" && pr.appname) {
+            setPendingRoute({ env: activeEnv, view: "apps", appname: "" });
+            const nsResp = await openNamespaces(pr.appname, false);
+            const nsName = pr.ns || "";
+            if (nsResp && nsName && nsResp[nsName]) {
+              viewNamespaceDetails(nsName, nsResp[nsName]);
+            }
           } else {
             setPendingRoute({ env: activeEnv, view: "apps", appname: "" });
           }
@@ -298,8 +311,10 @@ function App() {
       setSelectedNamespaces(new Set());
       setView("namespaces");
       if (push) pushUiUrl({ view: "namespaces", env: activeEnv, appname }, false);
+      return resp || {};
     } catch (e) {
       setError(e?.message || String(e));
+      return null;
     } finally {
       setLoading(false);
     }
@@ -475,12 +490,14 @@ function App() {
     setDetailNamespace(namespaceData);
     setDetailNamespaceName(namespaceName);
     setView("namespaceDetails");
+    pushUiUrl({ view: "namespaceDetails", env: activeEnv, appname: detailAppName, ns: namespaceName }, false);
   }
 
   function onBackFromNamespaceDetails() {
     setDetailNamespace(null);
     setDetailNamespaceName("");
     setView("namespaces");
+    pushUiUrl({ view: "namespaces", env: activeEnv, appname: detailAppName }, false);
   }
 
   async function deleteNamespace(namespaceName) {
