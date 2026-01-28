@@ -9,6 +9,9 @@ function AppView({
   clustersByEnv,
   onAddCluster,
   onDeleteCluster,
+  showCreateCluster,
+  onOpenCreateCluster,
+  onCloseCreateCluster,
   workspace,
   setWorkspace,
   requestsRepo,
@@ -40,6 +43,9 @@ function AppView({
   deleteApp,
   openNamespaces,
   onCreateApp,
+  showCreateApp,
+  onOpenCreateApp,
+  onCloseCreateApp,
   detailNamespace,
   detailNamespaceName,
   namespaces,
@@ -50,6 +56,9 @@ function AppView({
   viewNamespaceDetails,
   onUpdateNamespaceInfo,
   onCreateNamespace,
+  showCreateNamespace,
+  onOpenCreateNamespace,
+  onCloseCreateNamespace,
   detailAppName,
   l4IngressItems,
   egressIpItems,
@@ -166,15 +175,24 @@ function AppView({
             <div className="muted">Coming soon.</div>
           </div>
         ) : topTab === "Clusters" ? (
-          <ClustersTableView
-            envKeys={envKeys}
-            activeEnv={activeEnv}
-            clustersByEnv={clustersByEnv}
-            onEnvClick={onEnvClick}
-            onAddCluster={onAddCluster}
-            onDeleteCluster={onDeleteCluster}
-            loading={loading}
-          />
+          <>
+            <div className="row">
+              <div className="muted">{loading ? "Loading…" : ""}</div>
+            </div>
+
+            <ClustersTable
+              envKeys={envKeys}
+              activeEnv={activeEnv}
+              clustersByEnv={clustersByEnv}
+              onEnvClick={onEnvClick}
+              onAddCluster={onAddCluster}
+              onDeleteCluster={onDeleteCluster}
+              loading={loading}
+              showCreate={showCreateCluster}
+              onOpenCreate={onOpenCreateCluster}
+              onCloseCreate={onCloseCreateCluster}
+            />
+          </>
         ) : (
           <>
             <div className="row">
@@ -194,17 +212,22 @@ function AppView({
               ))}
             </div>
 
-            <div className="actions">
+            <div className="actions" style={view === "apps" ? { display: "flex", justifyContent: "space-between", alignItems: "center" } : {}}>
               {view === "apps" ? (
                 <>
-                  <button className="btn" type="button" onClick={onViewNamespaces}>
-                    View Namespaces
-                  </button>
-                  <button className="btn" type="button" onClick={onViewL4Ingress}>
-                    View L4 ingress IPs
-                  </button>
-                  <button className="btn" type="button" onClick={onViewEgressIps}>
-                    View Egress IPs
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button className="btn" type="button" onClick={onViewNamespaces}>
+                      View Namespaces
+                    </button>
+                    <button className="btn" type="button" onClick={onViewL4Ingress}>
+                      View L4 ingress IPs
+                    </button>
+                    <button className="btn" type="button" onClick={onViewEgressIps}>
+                      View Egress IPs
+                    </button>
+                  </div>
+                  <button className="btn btn-primary" type="button" onClick={onOpenCreateApp}>
+                    Add App
                   </button>
                 </>
               ) : view === "namespaceDetails" ? (
@@ -214,17 +237,22 @@ function AppView({
                   </button>
                 </>
               ) : view === "namespaces" ? (
-                <>
-                  <button className="btn" type="button" onClick={onBackToApps}>
-                    Back to App
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button className="btn" type="button" onClick={onBackToApps}>
+                      Back to App
+                    </button>
+                    <button className="btn" type="button" onClick={onViewL4Ingress}>
+                      View L4 ingress IPs
+                    </button>
+                    <button className="btn" type="button" onClick={onViewEgressIps}>
+                      View Egress IPs
+                    </button>
+                  </div>
+                  <button className="btn btn-primary" type="button" onClick={onOpenCreateNamespace}>
+                    Add Namespace
                   </button>
-                  <button className="btn" type="button" onClick={onViewL4Ingress}>
-                    View L4 ingress IPs
-                  </button>
-                  <button className="btn" type="button" onClick={onViewEgressIps}>
-                    View Egress IPs
-                  </button>
-                </>
+                </div>
               ) : view === "l4ingress" ? (
                 <>
                   <button className="btn" type="button" onClick={onBackToApps}>
@@ -268,6 +296,9 @@ function AppView({
                 onDeleteApp={deleteApp}
                 onViewDetails={(appname) => openNamespaces(appname, true)}
                 onCreateApp={onCreateApp}
+                showCreate={showCreateApp}
+                onOpenCreate={onOpenCreateApp}
+                onCloseCreate={onCloseCreateApp}
               />
             ) : view === "namespaceDetails" ? (
               <NamespaceDetails
@@ -278,20 +309,18 @@ function AppView({
                 onUpdateNamespaceInfo={onUpdateNamespaceInfo}
               />
             ) : view === "namespaces" ? (
-              <div>
-                <div style={{ marginTop: 8, marginBottom: 10, fontWeight: 600 }}>
-                  {`namespaces allocated in different cluster for ${detailAppName || ""}`}
-                </div>
-                <NamespacesTable
-                  namespaces={namespaces}
-                  selectedNamespaces={selectedNamespaces}
-                  onToggleNamespace={toggleNamespace}
-                  onSelectAll={onSelectAllNamespaces}
-                  onDeleteNamespace={deleteNamespace}
-                  onViewDetails={viewNamespaceDetails}
-                  onCreateNamespace={onCreateNamespace}
-                />
-              </div>
+              <NamespacesTable
+                namespaces={namespaces}
+                selectedNamespaces={selectedNamespaces}
+                onToggleNamespace={toggleNamespace}
+                onSelectAll={onSelectAllNamespaces}
+                onDeleteNamespace={deleteNamespace}
+                onViewDetails={viewNamespaceDetails}
+                onCreateNamespace={onCreateNamespace}
+                showCreate={showCreateNamespace}
+                onOpenCreate={onOpenCreateNamespace}
+                onCloseCreate={onCloseCreateNamespace}
+              />
             ) : view === "l4ingress" ? (
               <div>
                 <div style={{ marginTop: 8, marginBottom: 10, fontWeight: 600 }}>

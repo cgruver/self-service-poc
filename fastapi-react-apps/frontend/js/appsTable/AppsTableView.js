@@ -12,8 +12,10 @@ function AppsTableView({
   onDeleteApp,
   onViewDetails,
   onCreateApp,
+  showCreate,
+  onOpenCreate,
+  onCloseCreate,
 }) {
-  const [showCreate, setShowCreate] = React.useState(false);
   const [newAppName, setNewAppName] = React.useState("");
   const [newDescription, setNewDescription] = React.useState("");
   const [newManagedBy, setNewManagedBy] = React.useState("");
@@ -21,11 +23,6 @@ function AppsTableView({
 
   return (
     <div className="card">
-      <div style={{ display: "flex", justifyContent: "flex-end", padding: "12px 12px 12px 12px" }}>
-        <button className="btn btn-primary" type="button" onClick={() => setShowCreate(true)}>
-          Add App
-        </button>
-      </div>
 
       {showCreate ? (
         <div
@@ -39,13 +36,13 @@ function AppsTableView({
             zIndex: 9999,
           }}
           onClick={(e) => {
-            if (e.target === e.currentTarget) setShowCreate(false);
+            if (e.target === e.currentTarget) onCloseCreate();
           }}
         >
           <div className="card" style={{ width: 640, maxWidth: "92vw", padding: 16 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
               <div style={{ fontWeight: 700 }}>Create App</div>
-              <button className="btn" type="button" onClick={() => setShowCreate(false)}>
+              <button className="btn" type="button" onClick={onCloseCreate}>
                 Close
               </button>
             </div>
@@ -102,7 +99,7 @@ function AppsTableView({
                       managedby: newManagedBy,
                       clusters: newClusters,
                     });
-                    setShowCreate(false);
+                    onCloseCreate();
                     setNewAppName("");
                     setNewDescription("");
                     setNewManagedBy("");

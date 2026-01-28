@@ -10,8 +10,10 @@ function NamespacesTableView({
   onViewDetails,
   onDeleteNamespace,
   onCreateNamespace,
+  showCreate,
+  onOpenCreate,
+  onCloseCreate,
 }) {
-  const [showCreate, setShowCreate] = React.useState(false);
   const [newNamespace, setNewNamespace] = React.useState("");
   const [newClusters, setNewClusters] = React.useState("");
   const [newManagedByArgo, setNewManagedByArgo] = React.useState(false);
@@ -19,11 +21,6 @@ function NamespacesTableView({
 
   return (
     <div className="card">
-      <div style={{ display: "flex", justifyContent: "flex-end", padding: "12px 12px 12px 12px" }}>
-        <button className="btn btn-primary" type="button" onClick={() => setShowCreate(true)}>
-          Add Namespace
-        </button>
-      </div>
 
       {showCreate ? (
         <div
@@ -37,13 +34,13 @@ function NamespacesTableView({
             zIndex: 9999,
           }}
           onClick={(e) => {
-            if (e.target === e.currentTarget) setShowCreate(false);
+            if (e.target === e.currentTarget) onCloseCreate();
           }}
         >
           <div className="card" style={{ width: 640, maxWidth: "92vw", padding: 16 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
               <div style={{ fontWeight: 700 }}>Create Namespace</div>
-              <button className="btn" type="button" onClick={() => setShowCreate(false)}>
+              <button className="btn" type="button" onClick={onCloseCreate}>
                 Close
               </button>
             </div>
@@ -117,7 +114,7 @@ function NamespacesTableView({
                       need_argo: newManagedByArgo,
                       egress_nameid: newEgressNameId,
                     });
-                    setShowCreate(false);
+                    onCloseCreate();
                     setNewNamespace("");
                     setNewClusters("");
                     setNewManagedByArgo(false);

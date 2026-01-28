@@ -137,6 +137,9 @@ function App() {
   const [l4IpsByApp, setL4IpsByApp] = React.useState({});
   const [egressIpsByApp, setEgressIpsByApp] = React.useState({});
   const [selectedApps, setSelectedApps] = React.useState(new Set());
+  const [showCreateApp, setShowCreateApp] = React.useState(false);
+  const [showCreateNamespace, setShowCreateNamespace] = React.useState(false);
+  const [showCreateCluster, setShowCreateCluster] = React.useState(false);
   const [view, setView] = React.useState("apps");
   const [detailAppName, setDetailAppName] = React.useState("");
   const [detailNamespace, setDetailNamespace] = React.useState(null);
@@ -969,6 +972,9 @@ function App() {
       clustersByEnv={clustersByEnv}
       onAddCluster={onAddCluster}
       onDeleteCluster={onDeleteCluster}
+      showCreateCluster={showCreateCluster}
+      onOpenCreateCluster={() => setShowCreateCluster(true)}
+      onCloseCreateCluster={() => setShowCreateCluster(false)}
       workspace={workspace}
       setWorkspace={setWorkspace}
       requestsRepo={requestsRepo}
@@ -1007,7 +1013,13 @@ function App() {
       viewNamespaceDetails={viewNamespaceDetails}
       onUpdateNamespaceInfo={onUpdateNamespaceInfo}
       onCreateApp={createApp}
+      showCreateApp={showCreateApp}
+      onOpenCreateApp={() => setShowCreateApp(true)}
+      onCloseCreateApp={() => setShowCreateApp(false)}
       onCreateNamespace={createNamespace}
+      showCreateNamespace={showCreateNamespace}
+      onOpenCreateNamespace={() => setShowCreateNamespace(true)}
+      onCloseCreateNamespace={() => setShowCreateNamespace(false)}
       detailAppName={detailAppName}
       l4IngressItems={l4IngressItems}
       egressIpItems={egressIpItems}
