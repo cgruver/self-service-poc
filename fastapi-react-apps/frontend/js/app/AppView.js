@@ -49,6 +49,7 @@ function AppView({
   deleteNamespace,
   viewNamespaceDetails,
   onUpdateNamespaceInfo,
+  onCreateNamespace,
   detailAppName,
   l4IngressItems,
   egressIpItems,
@@ -288,6 +289,7 @@ function AppView({
                   onSelectAll={onSelectAllNamespaces}
                   onDeleteNamespace={deleteNamespace}
                   onViewDetails={viewNamespaceDetails}
+                  onCreateNamespace={onCreateNamespace}
                 />
               </div>
             ) : view === "l4ingress" ? (
