@@ -77,6 +77,16 @@ function isPrsPath() {
   return path === "/prs" || path === "/prs/";
 }
 
+function isClustersPath() {
+  const path = (window.location.pathname || "/").toLowerCase();
+  return path === "/clusters" || path === "/clusters/";
+}
+
+function clustersUrlWithEnv(env) {
+  const q = env ? `?env=${encodeURIComponent(env)}` : "";
+  return `/clusters${q}`;
+}
+
 function pushUiUrl(next, replace = false) {
   const url = buildUiUrl(next);
   const state = { view: next.view, env: next.env || "", appname: next.appname || "", ns: next.ns || "" };
@@ -124,6 +134,8 @@ function App() {
   const [egressIpItems, setEgressIpItems] = React.useState([]);
   const [selectedEgressIps, setSelectedEgressIps] = React.useState(new Set());
 
+  const [clustersByEnv, setClustersByEnv] = React.useState({});
+
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
   const [pendingRoute, setPendingRoute] = React.useState(() => parseUiRouteFromLocation());
@@ -145,6 +157,19 @@ function App() {
         return;
       }
       window.history.pushState({ topTab: "PRs and Approval" }, "", "/prs");
+      return;
+    }
+
+    if (nextTab === "Clusters") {
+      if (!configComplete) {
+        setTopTab("Home");
+        window.history.pushState({ topTab: "Home" }, "", "/home");
+        return;
+      }
+      const r = parseUiRouteFromLocation();
+      const nextEnv = r.env || activeEnv || (envKeys[0] || "");
+      if (nextEnv) setActiveEnv(nextEnv);
+      window.history.pushState({ topTab: "Clusters" }, "", clustersUrlWithEnv(nextEnv));
       return;
     }
 
@@ -196,8 +221,16 @@ function App() {
         const initialEnv = keys.includes(initial.env) ? initial.env : first;
         setPendingRoute(initial);
         setActiveEnv(initialEnv);
-        if (!isHomePath() && !isPrsPath()) {
+        if (!isHomePath() && !isPrsPath() && !isClustersPath()) {
           pushUiUrl({ view: initial.view, env: initialEnv, appname: initial.appname, ns: initial.ns }, true);
+        }
+
+        if (isClustersPath()) {
+          window.history.replaceState(
+            { topTab: isComplete ? "Clusters" : "Home" },
+            "",
+            clustersUrlWithEnv(initialEnv),
+          );
         }
 
         const isComplete = Boolean(
@@ -212,6 +245,11 @@ function App() {
           setTopTab("Home");
         } else if (isPrsPath()) {
           setTopTab(isComplete ? "PRs and Approval" : "Home");
+          if (!isComplete) {
+            window.history.replaceState({ topTab: "Home" }, "", "/home");
+          }
+        } else if (isClustersPath()) {
+          setTopTab(isComplete ? "Clusters" : "Home");
           if (!isComplete) {
             window.history.replaceState({ topTab: "Home" }, "", "/home");
           }
@@ -443,6 +481,19 @@ function App() {
         return;
       }
 
+      if (isClustersPath()) {
+        try {
+          const params = new URLSearchParams(window.location.search || "");
+          const envFromUrl = (params.get("env") || "").trim();
+          if (envFromUrl) setActiveEnv(envFromUrl);
+        } catch {
+          // ignore
+        }
+        setTopTab(configComplete ? "Clusters" : "Home");
+        if (!configComplete) window.history.replaceState({ topTab: "Home" }, "", "/home");
+        return;
+      }
+
       const r = parseUiRouteFromLocation();
       setPendingRoute(r);
       if (r.env) setActiveEnv(r.env);
@@ -459,7 +510,29 @@ function App() {
 
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, [envKeys, activeEnv]);
+  }, [envKeys, activeEnv, configComplete]);
+
+  React.useEffect(() => {
+    if (!configComplete) return;
+    if (topTab !== "Clusters") return;
+
+    const effectiveEnv = activeEnv || (envKeys[0] || "");
+    if (effectiveEnv && effectiveEnv !== activeEnv) setActiveEnv(effectiveEnv);
+
+    (async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const q = effectiveEnv ? `?env=${encodeURIComponent(effectiveEnv)}` : "";
+        const data = await fetchJson(`/api/clusters${q}`);
+        setClustersByEnv(data || {});
+      } catch (e) {
+        setError(e?.message || String(e));
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [topTab, configComplete, activeEnv, envKeys]);
 
   function toggleSelectAll(checked) {
     if (checked) {
@@ -779,6 +852,7 @@ function App() {
       topTab={topTab}
       configComplete={configComplete}
       onTopTabChange={setTopTabWithUrl}
+      clustersByEnv={clustersByEnv}
       workspace={workspace}
       setWorkspace={setWorkspace}
       requestsRepo={requestsRepo}

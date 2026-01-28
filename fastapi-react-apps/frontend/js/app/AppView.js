@@ -6,6 +6,7 @@ function AppView({
   topTab,
   configComplete,
   onTopTabChange,
+  clustersByEnv,
   workspace,
   setWorkspace,
   requestsRepo,
@@ -95,6 +96,13 @@ function AppView({
               >
                 PRs and Approval
               </button>
+              <button
+                className={topTab === "Clusters" ? "tab active" : "tab"}
+                onClick={() => onTopTabChange("Clusters")}
+                type="button"
+              >
+                Clusters
+              </button>
             </>
           ) : null}
         </div>
@@ -153,6 +161,41 @@ function AppView({
         ) : topTab === "PRs and Approval" ? (
           <div className="card" style={{ padding: 16 }}>
             <div className="muted">Coming soon.</div>
+          </div>
+        ) : topTab === "Clusters" ? (
+          <div style={{ display: "grid", gap: 12 }}>
+            {Object.entries(clustersByEnv || {}).map(([env, rows]) => (
+              <div key={env} className="card" style={{ padding: 16 }}>
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>{env}</div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Clustername</th>
+                      <th>purpose</th>
+                      <th>datacenter</th>
+                      <th>applications</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(rows || []).map((r) => (
+                      <tr key={r?.clustername || JSON.stringify(r)}>
+                        <td>{r?.clustername || ""}</td>
+                        <td>{r?.purpose || ""}</td>
+                        <td>{r?.datacenter || ""}</td>
+                        <td>{Array.isArray(r?.applications) ? r.applications.join(", ") : ""}</td>
+                      </tr>
+                    ))}
+                    {(rows || []).length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="muted">
+                          No clusters found.
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            ))}
           </div>
         ) : (
           <>
